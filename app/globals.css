@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Tiro+Telugu&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --plum: #2D1B35;
+  --gold: #C9933A;
+  --gold-light: #E8B96A;
+  --ivory: #FAF8F4;
+  --rose: #F0E8E0;
+  --charcoal: #1C1C1C;
+  --muted: #7A6A7E;
+  --border: #E2D8E8;
+  --success: #2D7A4F;
+  --danger: #B03A2E;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--ivory);
+  color: var(--charcoal);
+  -webkit-font-smoothing: antialiased;
+}
+
+.telugu {
+  font-family: 'Tiro Telugu', serif;
+  line-height: 1.8;
+}
+
+/* Gold ring progress */
+.progress-ring {
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+/* Smooth transitions */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(45, 27, 53, 0.12);
+}
+
+/* Status badges */
+.badge-pending   { background: #FEF3C7; color: #92400E; }
+.badge-progress  { background: #DBEAFE; color: #1E40AF; }
+.badge-completed { background: #D1FAE5; color: #065F46; }
+.badge-overdue   { background: #FEE2E2; color: #991B1B; }
