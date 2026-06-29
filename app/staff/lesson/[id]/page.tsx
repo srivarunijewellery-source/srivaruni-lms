@@ -12,69 +12,45 @@ export default function LessonPage() {
   const courseId = searchParams.get('course') || ''
 
   const [staff, setStaff] = useState<any>(null)
-  const [lang, setLang] = useState<'en' | 'te'>('te')
   const [content, setContent] = useState<Content | null>(null)
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [loading, setLoading] = useState(true)
   const [audioPlaying, setAudioPlaying] = useState(false)
   const [audioProgress, setAudioProgress] = useState(0)
-  const [markingDone, setMarkingDone] = useState(false)
+  const [saving, setSaving] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
     const s = localStorage.getItem('sv_staff')
-    const l = localStorage.getItem('sv_lang') as 'en' | 'te'
     if (!s) { router.push('/staff'); return }
     setStaff(JSON.parse(s))
-    if (l) setLang(l)
   }, [])
 
   useEffect(() => {
     if (!staff) return
     fetchContent()
-    markInProgress()
+    supabase.from('lms_progress').upsert({
+      assignment_id: assignmentId, staff_id: staff.id, content_id: contentId,
+      status: 'in_progress', started_at: new Date().toISOString(),
+    }, { onConflict: 'assignment_id,content_id' })
   }, [staff])
 
   async function fetchContent() {
-    const { data: c } = await supabase
-      .from('lms_content')
-      .select('*')
-      .eq('id', contentId)
-      .single()
+    const { data: c } = await supabase.from('lms_content').select('*').eq('id', contentId).single()
     setContent(c)
-
     if (c?.has_quiz) {
-      const { data: q } = await supabase
-        .from('lms_quizzes')
-        .select('*')
-        .eq('content_id', contentId)
-        .order('order_index')
+      const { data: q } = await supabase.from('lms_quizzes').select('*').eq('content_id', contentId).order('order_index')
       setQuizzes(q || [])
     }
     setLoading(false)
   }
 
-  async function markInProgress() {
+  async function handleComplete() {
+    setSaving(true)
     await supabase.from('lms_progress').upsert({
-      assignment_id: assignmentId,
-      staff_id: staff.id,
-      content_id: contentId,
-      status: 'in_progress',
-      started_at: new Date().toISOString(),
+      assignment_id: assignmentId, staff_id: staff.id, content_id: contentId,
+      status: 'completed', started_at: new Date().toISOString(), completed_at: new Date().toISOString(),
     }, { onConflict: 'assignment_id,content_id' })
-  }
-
-  async function markComplete() {
-    setMarkingDone(true)
-    await supabase.from('lms_progress').upsert({
-      assignment_id: assignmentId,
-      staff_id: staff.id,
-      content_id: contentId,
-      status: 'completed',
-      started_at: new Date().toISOString(),
-      completed_at: new Date().toISOString(),
-    }, { onConflict: 'assignment_id,content_id' })
-
     if (content?.has_quiz && quizzes.length > 0) {
       router.push(`/staff/quiz/${contentId}?assignment=${assignmentId}&course=${courseId}`)
     } else {
@@ -89,152 +65,85 @@ export default function LessonPage() {
   }
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: 'var(--ivory)' }}>
-      {/* Nav */}
-      <div className="flex items-center justify-between px-4 pt-6 pb-4"
-        style={{ background: 'var(--plum)' }}>
-        <button onClick={() => router.back()}
-          className="flex items-center gap-1 text-sm"
-          style={{ color: 'rgba(255,255,255,0.7)' }}>
-          ← {lang === 'te' ? 'వెనక్కి' : 'Back'}
-        </button>
-        <button onClick={() => {
-          const nl = lang === 'en' ? 'te' : 'en'
-          setLang(nl); localStorage.setItem('sv_lang', nl)
-        }}
-          className="text-xs px-2.5 py-1 rounded-full border"
-          style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}>
-          {lang === 'en' ? 'తెలుగు' : 'English'}
-        </button>
+    <div style={{ minHeight: '100vh', background: 'var(--ivory)', paddingBottom: 100 }}>
+      <div className="nav-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => router.back()}
+            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, padding: '7px 12px', color: '#FFFFFF', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+            ← Back
+          </button>
+          <span className="nav-title" style={{ fontSize: 15 }}>Lesson</span>
+        </div>
       </div>
 
-      {loading && (
-        <div className="text-center py-20" style={{ color: 'var(--muted)' }}>
-          <div className="text-3xl mb-2">⏳</div>
-        </div>
-      )}
+      {loading && <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--muted)', fontSize: 14 }}>Loading lesson...</div>}
 
       {!loading && content && (
         <>
-          {/* Photo */}
           {content.photo_url && (
-            <div className="relative">
+            <div style={{ position: 'relative' }}>
               <img src={content.photo_url} alt={content.title_en}
-                className="w-full object-cover" style={{ maxHeight: 280 }} />
-              <div className="absolute inset-0"
-                style={{ background: 'linear-gradient(to bottom, transparent 60%, var(--ivory))' }} />
+                style={{ width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' }} />
+              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, var(--ivory) 100%)' }} />
             </div>
           )}
 
-          <div className="px-4 py-4">
-            {/* Title */}
-            <div className="text-xs tracking-widest uppercase mb-1" style={{ color: 'var(--gold)' }}>
+          <div style={{ padding: '20px 20px 0' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--gold)', marginBottom: 6 }}>
               {content.category}
             </div>
-            <h1 className="text-xl font-bold mb-4" style={{ color: 'var(--plum)',
-              fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-              {lang === 'te' ? content.title_te : content.title_en}
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 20, lineHeight: 1.25 }}>
+              {content.title_en}
             </h1>
 
-            {/* Audio player */}
             {content.audio_url && (
-              <div className="rounded-2xl p-4 mb-4 flex items-center gap-4"
-                style={{ background: 'var(--plum)' }}>
+              <div style={{ background: 'var(--plum)', borderRadius: 14, padding: 16, marginBottom: 16 }}>
                 <audio ref={audioRef} src={content.audio_url}
-                  onTimeUpdate={() => {
-                    if (audioRef.current) {
-                      setAudioProgress((audioRef.current.currentTime / audioRef.current.duration) * 100)
-                    }
-                  }}
+                  onTimeUpdate={() => { if (audioRef.current) setAudioProgress((audioRef.current.currentTime / audioRef.current.duration) * 100) }}
                   onEnded={() => setAudioPlaying(false)} />
-                <button onClick={toggleAudio}
-                  className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 text-xl"
-                  style={{ background: 'var(--gold)' }}>
-                  {audioPlaying ? '⏸' : '▶'}
-                </button>
-                <div className="flex-1">
-                  <div className="text-xs mb-2" style={{ color: 'rgba(255,255,255,0.7)',
-                    fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-                    {lang === 'te' ? 'వివరణ వినండి' : 'Listen to explanation'}
-                  </div>
-                  <div className="rounded-full h-1.5 w-full" style={{ background: 'rgba(255,255,255,0.2)' }}>
-                    <div className="h-1.5 rounded-full transition-all"
-                      style={{ width: `${audioProgress}%`, background: 'var(--gold)' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <button onClick={toggleAudio}
+                    style={{ width: 46, height: 46, borderRadius: '50%', background: 'var(--gold-btn)', border: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {audioPlaying ? '⏸' : '▶'}
+                  </button>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', marginBottom: 8, fontWeight: 500 }}>Listen to explanation</p>
+                    <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 999, height: 4 }}>
+                      <div style={{ height: 4, borderRadius: 999, background: 'var(--gold-btn)', width: `${audioProgress}%`, transition: 'width 0.2s' }} />
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Lesson body */}
-            {(content.body_en || content.body_te) && (
-              <div className="rounded-2xl p-4 mb-4"
-                style={{ background: 'white', border: '1px solid var(--border)' }}>
-                <div className="text-xs font-semibold uppercase tracking-wide mb-3"
-                  style={{ color: 'var(--gold)' }}>
-                  {lang === 'te' ? 'పాఠం' : 'Lesson'}
-                </div>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--charcoal)',
-                  fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif',
-                  lineHeight: lang === 'te' ? '2' : '1.7' }}>
-                  {lang === 'te' ? content.body_te : content.body_en}
-                </p>
+            {content.body_en && (
+              <div className="card" style={{ padding: '16px 18px', marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gold)', marginBottom: 10 }}>Lesson</div>
+                <p style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--body)' }}>{content.body_en}</p>
               </div>
             )}
 
-            {/* Transcript */}
-            {(content.transcript_en || content.transcript_te) && (
-              <div className="rounded-2xl p-4 mb-4"
-                style={{ background: 'white', border: '1px solid var(--border)' }}>
-                <div className="text-xs font-semibold uppercase tracking-wide mb-3"
-                  style={{ color: 'var(--gold)' }}>
-                  {lang === 'te' ? 'వివరణ స్క్రిప్ట్' : 'Explanation Script'}
-                </div>
-                <p className="text-sm" style={{ color: 'var(--charcoal)',
-                  fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif',
-                  lineHeight: lang === 'te' ? '2' : '1.7' }}>
-                  {lang === 'te' ? content.transcript_te : content.transcript_en}
-                </p>
+            {content.transcript_en && (
+              <div className="card" style={{ padding: '16px 18px', marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gold)', marginBottom: 10 }}>Explanation Script</div>
+                <p style={{ fontSize: 15, lineHeight: 1.7, color: 'var(--body)' }}>{content.transcript_en}</p>
               </div>
             )}
 
-            {/* Quiz preview */}
             {content.has_quiz && quizzes.length > 0 && (
-              <div className="rounded-2xl p-4 mb-4"
-                style={{ background: '#FEF3C7', border: '1px solid #FDE68A' }}>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">📝</span>
-                  <div>
-                    <div className="font-semibold text-sm" style={{ color: '#92400E',
-                      fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-                      {lang === 'te' ? `${quizzes.length} ప్రశ్నలు ఉన్నాయి` : `${quizzes.length} quiz questions`}
-                    </div>
-                    <div className="text-xs" style={{ color: '#B45309',
-                      fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-                      {lang === 'te' ? 'పాఠం చదివిన తర్వాత క్విజ్ వస్తుంది' : 'Quiz follows after this lesson'}
-                    </div>
-                  </div>
-                </div>
+              <div style={{ background: 'var(--warning-bg)', border: '1px solid #FDE68A', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--warning-text)' }}>📝 {quizzes.length} quiz questions follow this lesson</p>
+                <p style={{ fontSize: 13, color: 'var(--warning-text)', marginTop: 3, opacity: 0.85 }}>Read carefully before continuing</p>
               </div>
             )}
           </div>
         </>
       )}
 
-      {/* Fixed bottom CTA */}
       {!loading && content && (
-        <div className="fixed bottom-0 left-0 right-0 p-4"
-          style={{ background: 'var(--ivory)', borderTop: '1px solid var(--border)' }}>
-          <button
-            onClick={markComplete}
-            disabled={markingDone}
-            className="w-full py-4 rounded-2xl font-semibold text-white text-base"
-            style={{ background: markingDone ? 'var(--muted)' : 'var(--plum)',
-              fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-            {markingDone
-              ? (lang === 'te' ? 'సేవ్ అవుతోంది...' : 'Saving...')
-              : content.has_quiz
-                ? (lang === 'te' ? 'క్విజ్ కి వెళ్ళు →' : 'Go to Quiz →')
-                : (lang === 'te' ? 'పూర్తయింది ✓' : 'Mark Complete ✓')}
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--white)', borderTop: '1.5px solid var(--border)', padding: '16px 20px 28px' }}>
+          <button className="btn-primary" onClick={handleComplete} disabled={saving}>
+            {saving ? 'Saving...' : content.has_quiz ? 'Continue to Quiz →' : 'Mark as Complete ✓'}
           </button>
         </div>
       )}

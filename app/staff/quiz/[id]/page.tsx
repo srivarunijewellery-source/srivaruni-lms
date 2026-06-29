@@ -12,7 +12,6 @@ export default function QuizPage() {
   const courseId = searchParams.get('course') || ''
 
   const [staff, setStaff] = useState<any>(null)
-  const [lang, setLang] = useState<'en' | 'te'>('te')
   const [quizzes, setQuizzes] = useState<Quiz[]>([])
   const [current, setCurrent] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
@@ -24,10 +23,8 @@ export default function QuizPage() {
 
   useEffect(() => {
     const s = localStorage.getItem('sv_staff')
-    const l = localStorage.getItem('sv_lang') as 'en' | 'te'
     if (!s) { router.push('/staff'); return }
     setStaff(JSON.parse(s))
-    if (l) setLang(l)
   }, [])
 
   useEffect(() => {
@@ -38,116 +35,66 @@ export default function QuizPage() {
   }, [staff])
 
   const q = quizzes[current]
-
   const options = q ? [
-    { key: 'a', en: q.option_a_en, te: q.option_a_te },
-    { key: 'b', en: q.option_b_en, te: q.option_b_te },
-    { key: 'c', en: q.option_c_en || '', te: q.option_c_te || '' },
-    { key: 'd', en: q.option_d_en || '', te: q.option_d_te || '' },
-  ].filter(o => o.en) : []
+    { key: 'a', text: q.option_a_en },
+    { key: 'b', text: q.option_b_en },
+    ...(q.option_c_en ? [{ key: 'c', text: q.option_c_en }] : []),
+    ...(q.option_d_en ? [{ key: 'd', text: q.option_d_en }] : []),
+  ] : []
 
   function submitAnswer() {
     if (!selected || !q) return
-    const correct = selected === q.correct_option
-    setAnswers(prev => [...prev, { qid: q.id, chosen: selected, correct }])
+    setAnswers(prev => [...prev, { qid: q.id, chosen: selected, correct: selected === q.correct_option }])
     setSubmitted(true)
   }
 
   async function nextQuestion() {
     if (current + 1 >= quizzes.length) {
-      // Save results
       setSaving(true)
-      const allAnswers = [...answers]
-      const score = Math.round((allAnswers.filter(a => a.correct).length / quizzes.length) * 100)
-      const passed = score >= 80
-
+      const all = [...answers]
+      const score = Math.round((all.filter(a => a.correct).length / quizzes.length) * 100)
       await supabase.from('lms_results').insert({
-        assignment_id: assignmentId,
-        staff_id: staff.id,
-        content_id: contentId,
-        score,
-        passed,
-        attempt_number: 1,
-        answers_json: allAnswers,
-        completed_at: new Date().toISOString(),
+        assignment_id: assignmentId, staff_id: staff.id, content_id: contentId,
+        score, passed: score >= 80, attempt_number: 1,
+        answers_json: all, completed_at: new Date().toISOString(),
       })
       setSaving(false)
       setDone(true)
     } else {
-      setCurrent(c => c + 1)
-      setSelected(null)
-      setSubmitted(false)
+      setCurrent(c => c + 1); setSelected(null); setSubmitted(false)
     }
   }
 
-  const score = answers.length > 0
-    ? Math.round((answers.filter(a => a.correct).length / quizzes.length) * 100)
-    : 0
-  const passed = score >= 80
+  const finalScore = Math.round((answers.filter(a => a.correct).length / Math.max(quizzes.length, 1)) * 100)
+  const passed = finalScore >= 80
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--ivory)' }}>
-      <div className="text-2xl">⏳</div>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--ivory)' }}>
+      <p style={{ color: 'var(--muted)' }}>Loading quiz...</p>
     </div>
   )
 
-  // Results screen
   if (done) return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 pb-8"
-      style={{ background: passed ? 'var(--plum)' : 'var(--ivory)' }}>
-      <div className="text-6xl mb-4">{passed ? '🏆' : '📚'}</div>
-      <h1 className="text-2xl font-bold mb-2 text-center"
-        style={{ color: passed ? 'white' : 'var(--charcoal)',
-          fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-        {passed
-          ? (lang === 'te' ? 'అభినందనలు!' : 'Congratulations!')
-          : (lang === 'te' ? 'మళ్ళీ ప్రయత్నించండి' : 'Keep Practicing')}
+    <div style={{ minHeight: '100vh', background: passed ? 'var(--plum)' : 'var(--ivory)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
+      <div style={{ fontSize: 56, marginBottom: 16 }}>{passed ? '🏆' : '📚'}</div>
+      <h1 style={{ fontSize: 26, fontWeight: 700, color: passed ? '#FFFFFF' : 'var(--charcoal)', marginBottom: 8, textAlign: 'center' }}>
+        {passed ? 'Congratulations!' : 'Keep practicing'}
       </h1>
-
-      {/* Score circle */}
-      <div className="w-28 h-28 rounded-full flex flex-col items-center justify-center my-6"
-        style={{ background: passed ? 'rgba(255,255,255,0.15)' : 'var(--rose)',
-          border: `3px solid ${passed ? 'var(--gold)' : 'var(--border)'}` }}>
-        <div className="text-3xl font-bold" style={{ color: passed ? 'var(--gold)' : 'var(--plum)' }}>
-          {score}%
-        </div>
-        <div className="text-xs" style={{ color: passed ? 'rgba(255,255,255,0.7)' : 'var(--muted)',
-          fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-          {lang === 'te' ? 'స్కోర్' : 'Score'}
-        </div>
+      <div style={{ width: 110, height: 110, borderRadius: '50%', border: `3px solid ${passed ? 'var(--gold-btn)' : 'var(--border-dark)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '20px 0', background: passed ? 'rgba(255,255,255,0.1)' : 'var(--white)' }}>
+        <span style={{ fontSize: 30, fontWeight: 700, color: passed ? 'var(--gold-btn)' : 'var(--plum)' }}>{finalScore}%</span>
+        <span style={{ fontSize: 12, color: passed ? 'rgba(255,255,255,0.7)' : 'var(--muted)', marginTop: 2 }}>Your score</span>
       </div>
-
-      <p className="text-center text-sm mb-8"
-        style={{ color: passed ? 'rgba(255,255,255,0.8)' : 'var(--muted)',
-          fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-        {passed
-          ? (lang === 'te'
-            ? 'మీరు ఈ పాఠాన్ని విజయవంతంగా పూర్తి చేశారు!'
-            : 'You passed this lesson successfully!')
-          : (lang === 'te'
-            ? 'పాస్ కావాలంటే కనీసం 80% కావాలి. పాఠం మళ్ళీ చదివి ప్రయత్నించండి.'
-            : 'You need at least 80% to pass. Review the lesson and try again.')}
+      <p style={{ textAlign: 'center', color: passed ? 'rgba(255,255,255,0.8)' : 'var(--muted)', fontSize: 15, marginBottom: 28, lineHeight: 1.6 }}>
+        {passed ? 'You passed this lesson. Well done!' : 'You need 80% to pass. Review the lesson and try again.'}
       </p>
-
-      <div className="w-full space-y-3">
-        <button
-          onClick={() => router.push(`/staff/course/${courseId}?assignment=${assignmentId}`)}
-          className="w-full py-4 rounded-2xl font-semibold text-sm"
-          style={{
-            background: passed ? 'var(--gold)' : 'var(--plum)',
-            color: 'white',
-            fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif'
-          }}>
-          {lang === 'te' ? 'కోర్సుకి వెళ్ళు →' : 'Back to Course →'}
+      <div style={{ width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <button className="btn-gold" onClick={() => router.push(`/staff/course/${courseId}?assignment=${assignmentId}`)}>
+          Back to course →
         </button>
         {!passed && (
-          <button
-            onClick={() => router.push(`/staff/lesson/${contentId}?assignment=${assignmentId}&course=${courseId}`)}
-            className="w-full py-4 rounded-2xl font-semibold text-sm"
-            style={{ background: 'transparent',
-              border: '1.5px solid var(--plum)', color: 'var(--plum)',
-              fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-            {lang === 'te' ? 'పాఠం మళ్ళీ చదువు' : 'Review Lesson'}
+          <button onClick={() => router.push(`/staff/lesson/${contentId}?assignment=${assignmentId}&course=${courseId}`)}
+            style={{ background: 'transparent', border: `1.5px solid ${passed ? 'rgba(255,255,255,0.3)' : 'var(--border-dark)'}`, borderRadius: 10, padding: '14px', fontSize: 15, fontWeight: 600, color: passed ? '#FFFFFF' : 'var(--body)', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+            Review lesson
           </button>
         )}
       </div>
@@ -155,127 +102,63 @@ export default function QuizPage() {
   )
 
   return (
-    <div className="min-h-screen pb-32" style={{ background: 'var(--ivory)' }}>
-      {/* Header */}
-      <div className="px-4 pt-6 pb-4" style={{ background: 'var(--plum)' }}>
-        <div className="flex justify-between items-center mb-4">
-          <div className="text-xs tracking-widest uppercase" style={{ color: 'var(--gold)' }}>
-            {lang === 'te' ? 'క్విజ్' : 'Quiz'}
-          </div>
-          <button onClick={() => {
-            const nl = lang === 'en' ? 'te' : 'en'
-            setLang(nl); localStorage.setItem('sv_lang', nl)
-          }}
-            className="text-xs px-2.5 py-1 rounded-full border"
-            style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}>
-            {lang === 'en' ? 'తెలుగు' : 'English'}
-          </button>
-        </div>
+    <div style={{ minHeight: '100vh', background: 'var(--ivory)', paddingBottom: 100 }}>
+      <div className="nav-bar">
+        <span className="nav-title">Quiz</span>
+        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>{current + 1} / {quizzes.length}</span>
+      </div>
 
-        {/* Progress dots */}
-        <div className="flex gap-1.5 mb-3">
-          {quizzes.map((_, i) => (
-            <div key={i} className="h-1.5 rounded-full transition-all"
-              style={{
-                flex: 1,
-                background: i < current ? 'var(--gold)' :
-                            i === current ? 'rgba(201,147,58,0.6)' : 'rgba(255,255,255,0.2)'
-              }} />
-          ))}
-        </div>
-        <div className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
-          {lang === 'te' ? `ప్రశ్న ${current + 1} / ${quizzes.length}` : `Question ${current + 1} of ${quizzes.length}`}
-        </div>
+      <div style={{ background: 'var(--plum)', padding: '0 20px 16px', display: 'flex', gap: 5 }}>
+        {quizzes.map((_, i) => (
+          <div key={i} style={{ flex: 1, height: 4, borderRadius: 999, background: i < current ? 'var(--gold-btn)' : i === current ? 'rgba(201,147,58,0.5)' : 'rgba(255,255,255,0.2)', transition: 'background 0.2s' }} />
+        ))}
       </div>
 
       {q && (
-        <div className="p-4">
-          {/* Question */}
-          <div className="rounded-2xl p-5 mb-4"
-            style={{ background: 'white', border: '1px solid var(--border)' }}>
-            <p className="font-semibold text-base leading-relaxed" style={{ color: 'var(--plum)',
-              fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif',
-              lineHeight: lang === 'te' ? '2' : '1.6' }}>
-              {lang === 'te' ? q.question_te : q.question_en}
-            </p>
+        <div style={{ padding: '20px 16px 0' }}>
+          <div className="card" style={{ padding: '18px 20px', marginBottom: 16 }}>
+            <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--charcoal)', lineHeight: 1.5 }}>{q.question_en}</p>
           </div>
 
-          {/* Options */}
-          <div className="space-y-3 mb-4">
+          <div>
             {options.map(opt => {
               const isSelected = selected === opt.key
-              const isCorrect = submitted && opt.key === q.correct_option
-              const isWrong   = submitted && isSelected && opt.key !== q.correct_option
-
+              const isCorrect  = submitted && opt.key === q.correct_option
+              const isWrong    = submitted && isSelected && !isCorrect
               return (
                 <button key={opt.key}
+                  className={`answer-option ${isCorrect ? 'correct' : isWrong ? 'wrong' : isSelected ? 'selected' : ''}`}
                   onClick={() => !submitted && setSelected(opt.key)}
-                  disabled={submitted}
-                  className="w-full text-left px-4 py-3.5 rounded-2xl transition-all"
-                  style={{
-                    background: isCorrect ? '#D1FAE5' : isWrong ? '#FEE2E2' :
-                                isSelected ? 'rgba(45,27,53,0.08)' : 'white',
-                    border: `1.5px solid ${isCorrect ? '#6EE7B7' : isWrong ? '#FCA5A5' :
-                             isSelected ? 'var(--plum)' : 'var(--border)'}`,
+                  disabled={submitted}>
+                  <div className="option-key" style={{
+                    background: isCorrect ? '#16A34A' : isWrong ? '#DC2626' : isSelected ? 'var(--plum)' : 'var(--rose-bg)',
+                    color: isCorrect || isWrong || isSelected ? '#FFFFFF' : 'var(--muted)',
                   }}>
-                  <div className="flex items-start gap-3">
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5"
-                      style={{
-                        background: isCorrect ? '#10B981' : isWrong ? '#EF4444' :
-                                    isSelected ? 'var(--plum)' : 'var(--rose)',
-                        color: isSelected || isCorrect || isWrong ? 'white' : 'var(--muted)'
-                      }}>
-                      {isCorrect ? '✓' : isWrong ? '✗' : opt.key.toUpperCase()}
-                    </div>
-                    <span className="text-sm" style={{
-                      color: isCorrect ? '#065F46' : isWrong ? '#991B1B' : 'var(--charcoal)',
-                      fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif',
-                      lineHeight: lang === 'te' ? '2' : '1.5'
-                    }}>
-                      {lang === 'te' ? opt.te : opt.en}
-                    </span>
+                    {isCorrect ? '✓' : isWrong ? '✗' : opt.key.toUpperCase()}
                   </div>
+                  <span style={{ fontSize: 15, lineHeight: 1.5, color: isCorrect ? 'var(--success-text)' : isWrong ? 'var(--danger-text)' : 'var(--body)', fontWeight: isSelected ? 500 : 400 }}>
+                    {opt.text}
+                  </span>
                 </button>
               )
             })}
           </div>
 
-          {/* Explanation after submit */}
           {submitted && q.explanation_en && (
-            <div className="rounded-2xl p-4 mb-4"
-              style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-              <div className="text-xs font-semibold uppercase tracking-wide mb-1"
-                style={{ color: '#065F46' }}>
-                {lang === 'te' ? 'వివరణ' : 'Explanation'}
-              </div>
-              <p className="text-sm" style={{ color: '#065F46',
-                fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif',
-                lineHeight: lang === 'te' ? '2' : '1.6' }}>
-                {lang === 'te' ? q.explanation_te : q.explanation_en}
-              </p>
+            <div style={{ background: 'var(--success-bg)', border: '1px solid #A7F3D0', borderRadius: 10, padding: '14px 16px', marginTop: 4 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--success-text)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Explanation</p>
+              <p style={{ fontSize: 14, color: 'var(--success-text)', lineHeight: 1.6 }}>{q.explanation_en}</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Fixed bottom CTA */}
-      <div className="fixed bottom-0 left-0 right-0 p-4"
-        style={{ background: 'var(--ivory)', borderTop: '1px solid var(--border)' }}>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--white)', borderTop: '1.5px solid var(--border)', padding: '16px 20px 28px' }}>
         {!submitted ? (
-          <button onClick={submitAnswer} disabled={!selected}
-            className="w-full py-4 rounded-2xl font-semibold text-white"
-            style={{ background: selected ? 'var(--plum)' : 'var(--muted)',
-              fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-            {lang === 'te' ? 'సమాధానం ఇవ్వు' : 'Submit Answer'}
-          </button>
+          <button className="btn-primary" onClick={submitAnswer} disabled={!selected}>Submit answer</button>
         ) : (
-          <button onClick={nextQuestion} disabled={saving}
-            className="w-full py-4 rounded-2xl font-semibold text-white"
-            style={{ background: 'var(--gold)',
-              fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-            {saving ? '...' : current + 1 >= quizzes.length
-              ? (lang === 'te' ? 'ఫలితాలు చూడు →' : 'See Results →')
-              : (lang === 'te' ? 'తర్వాత ప్రశ్న →' : 'Next Question →')}
+          <button className="btn-gold" onClick={nextQuestion} disabled={saving}>
+            {saving ? 'Saving...' : current + 1 >= quizzes.length ? 'See results →' : 'Next question →'}
           </button>
         )}
       </div>

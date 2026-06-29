@@ -8,130 +8,87 @@ export default function StaffLogin() {
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [lang, setLang] = useState<'en' | 'te'>('te')
-
-  const t = {
-    en: {
-      welcome: 'Welcome Back',
-      sub: 'Sri Varuni Staff Training',
-      label: 'Your Name',
-      placeholder: 'Enter your name',
-      btn: 'Continue',
-      loading: 'Finding your profile...',
-      err: 'Name not found. Please check spelling or ask your manager.',
-    },
-    te: {
-      welcome: 'తిరిగి స్వాగతం',
-      sub: 'శ్రీ వరుణి సిబ్బంది శిక్షణ',
-      label: 'మీ పేరు',
-      placeholder: 'మీ పేరు నమోదు చేయండి',
-      btn: 'కొనసాగించు',
-      loading: 'మీ వివరాలు వెతుకుతున్నాం...',
-      err: 'పేరు కనుగొనబడలేదు. స్పెల్లింగ్ తనిఖీ చేయండి లేదా మేనేజర్‌ను అడగండి.',
-    }
-  }[lang]
 
   async function handleLogin() {
-    if (!name.trim()) return
+    const trimmed = name.trim()
+    if (!trimmed) return
     setLoading(true)
     setError('')
+
     const { data, error: err } = await supabase
       .from('staff')
       .select('id, name, role, active')
-      .ilike('name', name.trim())
+      .ilike('name', `%${trimmed}%`)
       .eq('active', true)
-      .single()
 
-    if (err || !data) {
-      setError(t.err)
+    if (err || !data || data.length === 0) {
+      setError('Name not found. Check spelling or ask your manager.')
       setLoading(false)
       return
     }
-    localStorage.setItem('sv_staff', JSON.stringify(data))
-    localStorage.setItem('sv_lang', lang)
+
+    localStorage.setItem('sv_staff', JSON.stringify(data[0]))
     router.push('/staff/dashboard')
   }
 
+  const staffNames = ['Aarithi','D Mamatha','G Jyothi','J Revathi','Lingamma','MD Asia','Ramesh','U Latha','Vijay Krishna']
+
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--plum)' }}>
-      {/* Header */}
-      <div className="flex justify-between items-center px-6 pt-8 pb-4">
-        <div>
-          <div className="text-xs font-medium tracking-widest uppercase mb-1"
-            style={{ color: 'var(--gold)' }}>Sri Varuni Jewellery</div>
-          <div className="text-white text-xl font-semibold"
-            style={{ fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-            {t.sub}
-          </div>
+    <div style={{ minHeight: '100vh', background: 'var(--plum)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '48px 28px 32px' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--gold-btn)', marginBottom: 8 }}>
+          Sri Varuni Jewellery
         </div>
-        {/* Language toggle */}
-        <button
-          onClick={() => setLang(lang === 'en' ? 'te' : 'en')}
-          className="text-sm px-3 py-1.5 rounded-full border font-medium transition-all"
-          style={{ borderColor: 'var(--gold)', color: 'var(--gold)' }}>
-          {lang === 'en' ? 'తెలుగు' : 'English'}
-        </button>
-      </div>
-
-      {/* Gold divider */}
-      <div className="mx-6 mb-8" style={{ height: 1, background: 'var(--gold)', opacity: 0.3 }} />
-
-      {/* Logo area */}
-      <div className="flex flex-col items-center px-6 mb-10">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
-          style={{ background: 'rgba(201,147,58,0.15)', border: '2px solid var(--gold)' }}>
-          <span className="text-3xl">💎</span>
-        </div>
-        <h1 className="text-white text-2xl font-bold mb-1"
-          style={{ fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-          {t.welcome}
+        <h1 style={{ fontSize: 26, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.2 }}>
+          Staff Training Portal
         </h1>
+        <p style={{ color: 'rgba(255,255,255,0.65)', marginTop: 8, fontSize: 14 }}>
+          Sign in to view your assigned courses
+        </p>
       </div>
 
-      {/* Login card */}
-      <div className="mx-4 rounded-2xl p-6 flex-1"
-        style={{ background: 'var(--ivory)' }}>
-        <label className="block text-sm font-medium mb-2"
-          style={{ color: 'var(--muted)', fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
-          {t.label}
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          placeholder={t.placeholder}
-          className="w-full px-4 py-3 rounded-xl text-base outline-none mb-4"
-          style={{
-            background: 'var(--rose)',
-            border: '1.5px solid var(--border)',
-            color: 'var(--charcoal)',
-            fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif'
-          }}
-        />
+      <div style={{ flex: 1, background: 'var(--ivory)', borderRadius: '24px 24px 0 0', padding: '32px 24px 40px' }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--charcoal)', marginBottom: 24 }}>
+          Enter your name
+        </h2>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Full Name
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            placeholder="e.g. D Mamatha"
+            style={{ width: '100%', padding: '14px 16px', fontSize: 16, border: '1.5px solid var(--border)', borderRadius: 10, background: 'var(--white)', color: 'var(--charcoal)', outline: 'none', fontFamily: 'DM Sans, sans-serif' }}
+          />
+        </div>
 
         {error && (
-          <div className="text-sm mb-4 px-3 py-2 rounded-lg"
-            style={{ background: '#FEE2E2', color: 'var(--danger)',
-              fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif' }}>
+          <div style={{ background: 'var(--danger-bg)', color: 'var(--danger-text)', border: '1px solid #FECACA', borderRadius: 8, padding: '10px 14px', fontSize: 14, marginBottom: 16, fontWeight: 500 }}>
             {error}
           </div>
         )}
 
-        <button
-          onClick={handleLogin}
-          disabled={loading || !name.trim()}
-          className="w-full py-3.5 rounded-xl font-semibold text-white transition-all"
-          style={{
-            background: loading || !name.trim() ? 'var(--muted)' : 'var(--plum)',
-            fontFamily: lang === 'te' ? 'Tiro Telugu, serif' : 'DM Sans, sans-serif'
-          }}>
-          {loading ? t.loading : t.btn}
+        <button className="btn-primary" onClick={handleLogin} disabled={loading || !name.trim()}>
+          {loading ? 'Finding your profile...' : 'Continue →'}
         </button>
 
-        <p className="text-center text-xs mt-6" style={{ color: 'var(--muted)' }}>
-          Having trouble? Ask your store manager.
-        </p>
+        <div style={{ marginTop: 28, padding: '16px', background: 'var(--rose-bg)', borderRadius: 10, border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+            Tap your name
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {staffNames.map(n => (
+              <button key={n} onClick={() => setName(n)}
+                style={{ padding: '5px 12px', borderRadius: 20, border: '1px solid var(--border-dark)', background: 'var(--white)', color: 'var(--body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
