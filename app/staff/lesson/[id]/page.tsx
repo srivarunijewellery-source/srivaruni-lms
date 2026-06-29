@@ -4,24 +4,51 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 /* ── Structured content renderer ── */
+
 function ContentBlock({ block, lang }: { block: any; lang: 'en' | 'te' }) {
-  const tf = (s: string) => ({ fontFamily: lang === 'te' ? 'Noto Sans Telugu,sans-serif' : 'DM Sans,sans-serif', lineHeight: lang === 'te' ? 1.9 : 1.5 })
+  const tf = { fontFamily: lang === 'te' ? 'Noto Sans Telugu,sans-serif' : 'DM Sans,sans-serif', lineHeight: lang === 'te' ? 1.9 : 1.6 }
+
+  if (block.type === 'why') return (
+    <div style={{ background: 'var(--warning-bg)', border: '1px solid #FDE68A', borderRadius: 12, padding: '14px 16px', marginBottom: 18 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--warning-text)', marginBottom: 8 }}>
+        {block.icon} {block.label}
+      </div>
+      <p style={{ fontSize: 14, color: 'var(--warning-text)', margin: 0, ...tf }}>{block.text}</p>
+    </div>
+  )
+
+  if (block.type === 'scenarios') return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: 'var(--gold)', marginBottom: 10 }}>
+        {block.icon} {block.label}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+        {block.items?.map((item: any, i: number) => (
+          <div key={i} style={{ background: 'var(--info-bg)', border: '1px solid #BFDBFE', borderRadius: 10, padding: '12px 14px' }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--info-text)', margin: '0 0 6px 0', ...tf }}>💬 {item.title}</p>
+            <p style={{ fontSize: 13, color: 'var(--info-text)', margin: 0, ...tf }}>→ {item.response}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 
   if (block.type === 'steps') return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <span style={{ fontSize: 18 }}>{block.icon}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--gold)' }}>
-          {block.label}
-        </span>
+        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.09em', color: 'var(--gold)' }}>{block.label}</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {block.items.map((item: any, i: number) => (
+      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+        {block.items?.map((item: any, i: number) => (
           <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, background: 'var(--white)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--plum)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>
               {item.step}
             </div>
-            <span style={{ fontSize: 14, color: 'var(--body)', ...tf(item.text) }}>{item.text}</span>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', margin: '0 0 4px 0', ...tf }}>{item.text}</p>
+              {item.detail && <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0, ...tf }}>{item.detail}</p>}
+            </div>
           </div>
         ))}
       </div>
@@ -29,25 +56,26 @@ function ContentBlock({ block, lang }: { block: any; lang: 'en' | 'te' }) {
   )
 
   if (block.type === 'rule') return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <span style={{ fontSize: 18 }}>{block.icon}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.09em', color: 'var(--gold)' }}>
-          {block.label}
-        </span>
+        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.09em', color: 'var(--gold)' }}>{block.label}</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {block.items.map((item: any, i: number) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, borderRadius: 10, padding: '10px 14px',
+      <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
+        {block.items?.map((item: any, i: number) => (
+          <div key={i} style={{ borderRadius: 10, padding: '10px 14px',
             background: item.do ? 'var(--success-bg)' : 'var(--danger-bg)',
             border: `1px solid ${item.do ? '#A7F3D0' : '#FECACA'}` }}>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 1,
-              background: item.do ? '#16A34A' : '#DC2626', color: '#fff' }}>
-              {item.do ? '✓' : '✗'}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 2,
+                background: item.do ? '#16A34A' : '#DC2626', color: '#fff' }}>
+                {item.do ? '✓' : '✗'}
+              </div>
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: item.do ? 'var(--success-text)' : 'var(--danger-text)', margin: '0 0 4px 0', ...tf }}>{item.text}</p>
+                {item.detail && <p style={{ fontSize: 13, color: item.do ? 'var(--success-text)' : 'var(--danger-text)', margin: 0, opacity: 0.85, ...tf }}>{item.detail}</p>}
+              </div>
             </div>
-            <span style={{ fontSize: 14, color: item.do ? 'var(--success-text)' : 'var(--danger-text)', ...tf(item.text) }}>
-              {item.text}
-            </span>
           </div>
         ))}
       </div>
