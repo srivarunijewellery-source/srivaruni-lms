@@ -18,7 +18,7 @@ export default function StaffDashboard() {
   const router = useRouter()
   const [staff, setStaff]         = useState<any>(null)
   const [assignments, setAssignments] = useState<any[]>([])
-  const [results, setResults]     = useState<any[]>([])
+  const [quizHistory, setQuizHistory] = useState<any[]>([])
   const [tab, setTab]             = useState<'courses' | 'history'>('courses')
   const [loading, setLoading]     = useState(true)
 
@@ -32,25 +32,36 @@ export default function StaffDashboard() {
 
   async function load() {
     setLoading(true)
-    const [{ data: asgn }, { data: res }] = await Promise.all([
+    const [{ data: asgn }, { data: quiz }] = await Promise.all([
       supabase
         .from('lms_assignments')
         .select('id, course_id, status, due_date, assigned_at, completed_at, course:lms_courses(title_en, description_en, pass_threshold)')
         .eq('staff_id', staff.id)
         .order('assigned_at', { ascending: false }),
       supabase
-        .from('lms_results')
-        .select('id, score, passed, completed_at, content:lms_content(title_en)')
+        .from('lms_module_quiz_results')
+        .select('score, passed, is_best_score, attempt_number, completed_at, course:lms_courses(title_en)')
         .eq('staff_id', staff.id)
         .order('completed_at', { ascending: false }),
     ])
     setAssignments(asgn || [])
-    setResults(res || [])
+    setQuizHistory(quiz || [])
     setLoading(false)
   }
 
   const pending   = assignments.filter(a => a.status !== 'completed')
   const completed = assignments.filter(a => a.status === 'completed')
+
+  // Group quiz history by course — best and latest per course
+  const courseScores: Record<string, { title: string; best: any; latest: any; attempts: number }> = {}
+  for (const q of quizHistory) {
+    const title = (q.course as any)?.title_en || 'Unknown'
+    const cid = title // group by title since we don't have course_id here
+    if (!courseScores[cid]) courseScores[cid] = { title, best: null, latest: null, attempts: 0 }
+    courseScores[cid].attempts++
+    if (q.is_best_score) courseScores[cid].best = q
+    if (!courseScores[cid].latest) courseScores[cid].latest = q
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ivory)', paddingBottom: 40 }}>
@@ -58,9 +69,7 @@ export default function StaffDashboard() {
       <div className="nav-bar">
         <div>
           <span className="nav-brand">Sri Varuni Jewellery</span>
-          <span className="nav-title">
-            {staff ? `Hello, ${staff.name.split(' ')[0]}` : 'My Training'}
-          </span>
+          <span className="nav-title">{staff ? `Hello, ${staff.name.split(' ')[0]}` : 'My Training'}</span>
         </div>
         <button onClick={() => { localStorage.removeItem('sv_staff'); router.replace('/staff') }}
           style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, padding: '7px 14px', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans,sans-serif' }}>
@@ -74,7 +83,7 @@ export default function StaffDashboard() {
           {[
             { num: assignments.length, label: 'Assigned' },
             { num: completed.length,   label: 'Completed' },
-            { num: results.length,     label: 'Quizzes taken' },
+            { num: Object.keys(courseScores).length, label: 'Quizzes taken' },
           ].map(s => (
             <div key={s.label} className="stat-card">
               <span className="stat-number">{s.num}</span>
@@ -90,7 +99,7 @@ export default function StaffDashboard() {
           My Courses {pending.length > 0 && <span style={{ background: 'var(--gold-btn)', color: '#fff', borderRadius: '50%', fontSize: 11, padding: '1px 6px', marginLeft: 4 }}>{pending.length}</span>}
         </button>
         <button className={`tab-btn${tab === 'history' ? ' active' : ''}`} onClick={() => setTab('history')}>
-          History
+          My Scores
         </button>
       </div>
 
@@ -104,7 +113,6 @@ export default function StaffDashboard() {
               <div style={{ textAlign: 'center', padding: '60px 0' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>📚</div>
                 <p style={{ color: 'var(--muted)', fontSize: 15 }}>No courses assigned yet.</p>
-                <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 6 }}>Ask your manager to assign a course.</p>
               </div>
             ) : assignments.map(a => (
               <div key={a.id} style={{ marginBottom: 12 }}>
@@ -144,78 +152,70 @@ export default function StaffDashboard() {
           </>
         )}
 
-        {/* HISTORY TAB */}
+        {/* SCORES / HISTORY TAB */}
         {!loading && tab === 'history' && (
           <>
-            {results.length === 0 && completed.length === 0 ? (
+            {Object.keys(courseScores).length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 0' }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-                <p style={{ color: 'var(--muted)', fontSize: 15 }}>No history yet.</p>
-                <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 6 }}>Complete a course to see your results here.</p>
+                <p style={{ color: 'var(--muted)', fontSize: 15 }}>No quiz scores yet.</p>
+                <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 6 }}>Complete a course quiz to see your scores here.</p>
               </div>
-            ) : (
-              <>
-                {/* Quiz results */}
-                {results.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
-                      Quiz Results
-                    </div>
-                    {results.map(r => (
-                      <div key={r.id} style={{ marginBottom: 10 }}>
-                        <div className="card" style={{ padding: '14px 16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{
-                              width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                              background: r.passed ? 'var(--success-bg)' : 'var(--danger-bg)',
-                            }}>
-                              <span style={{ fontSize: 13, fontWeight: 700, color: r.passed ? 'var(--success-text)' : 'var(--danger-text)' }}>{r.score}%</span>
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--charcoal)', marginBottom: 2 }}>
-                                {r.content?.title_en || 'Quiz'}
-                              </p>
-                              <p style={{ fontSize: 12, color: 'var(--muted)' }}>
-                                {new Date(r.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </p>
-                            </div>
-                            <span className={r.passed ? 'badge badge-completed' : 'badge badge-overdue'}>
-                              {r.passed ? 'Passed' : 'Failed'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
+            ) : Object.values(courseScores).map((cs: any, i) => (
+              <div key={i} style={{ marginBottom: 12 }}>
+                <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+                  {/* Course title bar */}
+                  <div style={{ padding: '12px 16px', background: 'var(--plum)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: '#fff', margin: 0 }}>{cs.title}</h3>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{cs.attempts} attempt{cs.attempts > 1 ? 's' : ''}</span>
+                  </div>
 
-                {/* Completed courses */}
-                {completed.length > 0 && (
-                  <>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '16px 0 10px' }}>
-                      Completed Courses
-                    </div>
-                    {completed.map(a => (
-                      <div key={a.id} style={{ marginBottom: 10 }}>
-                        <div style={{ background: 'var(--plum)', borderRadius: 14, padding: '14px 16px', border: '1.5px solid var(--gold-btn)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div style={{ fontSize: 28, flexShrink: 0 }}>🏆</div>
-                          <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{a.course?.title_en}</p>
-                            {a.completed_at && (
-                              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>
-                                Completed {new Date(a.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </p>
-                            )}
-                          </div>
-                          <span className="badge badge-completed">Done</span>
+                  {/* Best score */}
+                  {cs.best && (
+                    <div style={{ padding: '12px 16px', borderBottom: cs.latest && cs.latest.score !== cs.best?.score ? '1px solid var(--border)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F3E8FF' }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#6B21A8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>★ Best Score</div>
+                        <div style={{ fontSize: 12, color: '#5A5A5A' }}>
+                          {new Date(cs.best.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {' · '}Attempt {cs.best.attempt_number}
                         </div>
                       </div>
-                    ))}
-                  </>
-                )}
-              </>
-            )}
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: cs.best.passed ? 'var(--success-text)' : 'var(--danger-text)' }}>{cs.best.score}%</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: cs.best.passed ? 'var(--success-text)' : 'var(--danger-text)' }}>{cs.best.passed ? 'Passed ✓' : 'Failed'}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Latest score — only show if different from best */}
+                  {cs.latest && cs.best && cs.latest.score !== cs.best.score && (
+                    <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Latest Score</div>
+                        <div style={{ fontSize: 12, color: '#5A5A5A' }}>
+                          {new Date(cs.latest.completed_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {' · '}Attempt {cs.latest.attempt_number}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: cs.latest.passed ? 'var(--success-text)' : 'var(--danger-text)' }}>{cs.latest.score}%</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: cs.latest.passed ? 'var(--success-text)' : 'var(--danger-text)' }}>{cs.latest.passed ? 'Passed ✓' : 'Failed'}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Completed badge if passed */}
+                  {cs.best?.passed && (
+                    <div style={{ padding: '10px 16px', background: 'var(--success-bg)', borderTop: '1px solid #A7F3D0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>🏅</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--success-text)' }}>
+                        Module completed
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </>
         )}
       </div>
