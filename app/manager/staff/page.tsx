@@ -27,16 +27,21 @@ export default function ManagerStaff() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [filterCourse, setFilterCourse] = useState('all')
   const [courses, setCourses] = useState<any[]>([])
+  const [mgr, setMgr] = useState<any>(null)
 
   useEffect(() => {
     const m = localStorage.getItem('sv_manager')
     if (!m) { router.replace('/manager/login'); return }
-    load()
+    const parsed = JSON.parse(m)
+    setMgr(parsed)
   }, [])
 
+  useEffect(() => { if (mgr) load() }, [mgr])
+
   async function load() {
+    const branch = mgr?.selectedBranch || 'Boduppal'
     const [{ data: s }, { data: c }] = await Promise.all([
-      supabase.from('staff').select('id, name, role').eq('active', true).order('name'),
+      supabase.from('staff').select('id, name, role, branch').eq('active', true).eq('branch', branch).order('name'),
       supabase.from('lms_courses').select('id, title_en').eq('status', 'published').order('created_at'),
     ])
     setCourses(c || [])
@@ -102,7 +107,9 @@ export default function ManagerStaff() {
     <div>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1E0A2E', margin: 0 }}>My Team</h1>
-        <p style={{ color: '#5A5A5A', fontSize: 14, marginTop: 4 }}>Individual staff progress and scores</p>
+        <p style={{ color: '#5A5A5A', fontSize: 14, marginTop: 4 }}>
+          {mgr?.selectedBranch || 'Boduppal'} branch · Individual staff progress and scores
+        </p>
       </div>
 
       {/* Filter */}

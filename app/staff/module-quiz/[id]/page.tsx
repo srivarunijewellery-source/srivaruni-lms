@@ -22,6 +22,8 @@ export default function ModuleQuizPage() {
   const [finalScore, setFinalScore] = useState(0)
   const [lang,       setLang]       = useState<'en'|'te'>('en')
   const [attemptNum, setAttemptNum] = useState(1)
+  const [locked,     setLocked]     = useState(false)
+  const [lockMessage, setLockMessage] = useState('')
 
   useEffect(() => {
     const s = localStorage.getItem('sv_staff')
@@ -45,6 +47,26 @@ export default function ModuleQuizPage() {
       .eq('course_id', courseId)
 
     const contentIds = (ci || []).map((i:any) => i.content_id)
+
+    // SERVER-SIDE LOCK CHECK — verify all lessons are actually completed
+    // before allowing the quiz to load, regardless of how the page was reached
+    const { data: progress } = await supabase
+      .from('lms_progress')
+      .select('content_id, status')
+      .eq('assignment_id', assignmentId)
+      .eq('staff_id', staff.id)
+
+    const completedIds = new Set((progress || []).filter((p: any) => p.status === 'completed').map((p: any) => p.content_id))
+    const allDone = contentIds.length > 0 && contentIds.every((cid: string) => completedIds.has(cid))
+
+    if (!allDone) {
+      setLocked(true)
+      setLockMessage(lang === 'te'
+        ? 'క్విజ్ తీసుకునే ముందు అన్ని పాఠాలు పూర్తి చేయాలి.'
+        : 'You must complete all lessons before taking this quiz.')
+      setLoading(false)
+      return
+    }
 
     // Pull ALL questions from the quiz banks for this course
     const { data: q } = await supabase
@@ -133,6 +155,25 @@ export default function ModuleQuizPage() {
   if (loading) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--ivory)' }}>
       <p style={{ color:'var(--muted)' }}>Loading quiz...</p>
+    </div>
+  )
+
+  // Locked screen — all lessons not yet completed
+  if (locked) return (
+    <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 24px', background:'var(--ivory)' }}>
+      <div style={{ fontSize:56, marginBottom:16 }}>🔒</div>
+      <h1 style={{ fontSize:22, fontWeight:700, color:'var(--charcoal)', textAlign:'center', marginBottom:10,
+        fontFamily: lang === 'te' ? 'Noto Sans Telugu,sans-serif' : 'DM Sans,sans-serif' }}>
+        {lang === 'te' ? 'క్విజ్ లాక్ చేయబడింది' : 'Quiz Locked'}
+      </h1>
+      <p style={{ textAlign:'center', fontSize:15, lineHeight:1.6, marginBottom:28, color:'var(--muted)', maxWidth:340,
+        fontFamily: lang === 'te' ? 'Noto Sans Telugu,sans-serif' : 'DM Sans,sans-serif' }}>
+        {lockMessage}
+      </p>
+      <button className="btn-primary" style={{ maxWidth:320 }}
+        onClick={() => router.push(`/staff/course/${courseId}?assignment=${assignmentId}`)}>
+        {lang === 'te' ? 'పాఠాలకు వెళ్ళు →' : 'Go to Lessons →'}
+      </button>
     </div>
   )
 

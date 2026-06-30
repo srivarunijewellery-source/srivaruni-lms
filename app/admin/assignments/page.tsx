@@ -20,9 +20,9 @@ export default function AdminAssignments() {
   async function load() {
     const [{ data: c }, { data: s }, { data: a }] = await Promise.all([
       supabase.from('lms_courses').select('id, title_en, status').order('created_at'),
-      supabase.from('staff').select('id, name, role').eq('active', true).order('name'),
+      supabase.from('staff').select('id, name, role, branch').eq('active', true).order('branch').order('name'),
       supabase.from('lms_assignments')
-        .select('id, status, due_date, assigned_at, course:lms_courses(id,title_en), staff:staff(id,name,role)')
+        .select('id, status, due_date, assigned_at, course:lms_courses(id,title_en), staff:staff(id,name,role,branch)')
         .order('assigned_at', { ascending: false }),
     ])
     setCourses(c || [])
@@ -122,7 +122,7 @@ export default function AdminAssignments() {
             {(['all', 'individual'] as const).map(t => (
               <button key={t} onClick={() => setAssignTarget(t)}
                 style={{ padding: '8px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', border: '1.5px solid', borderColor: assignTarget === t ? '#1E0A2E' : '#D4CEC8', background: assignTarget === t ? '#1E0A2E' : '#fff', color: assignTarget === t ? '#fff' : '#5A5A5A', transition: 'all 0.15s' }}>
-                {t === 'all' ? 'All Active Staff' : 'Individual Staff'}
+                {t === 'all' ? `All Active Staff (${staff.length})` : 'Individual Staff'}
               </button>
             ))}
           </div>
@@ -132,14 +132,23 @@ export default function AdminAssignments() {
         {assignTarget === 'individual' && (
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#5A5A5A', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Select Staff Members</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {staff.map(s => (
-                <button key={s.id} onClick={() => setSelectedStaff(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])}
-                  style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', border: '1.5px solid', transition: 'all 0.15s', borderColor: selectedStaff.includes(s.id) ? '#1E0A2E' : '#D4CEC8', background: selectedStaff.includes(s.id) ? '#1E0A2E' : '#fff', color: selectedStaff.includes(s.id) ? '#fff' : '#2C2C2C' }}>
-                  {s.name}
-                </button>
-              ))}
-            </div>
+            {['Boduppal', 'Zahirabad'].map(br => {
+              const branchStaff = staff.filter(s => s.branch === br)
+              if (branchStaff.length === 0) return null
+              return (
+                <div key={br} style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#C9933A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{br}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {branchStaff.map(s => (
+                      <button key={s.id} onClick={() => setSelectedStaff(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])}
+                        style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', border: '1.5px solid', transition: 'all 0.15s', borderColor: selectedStaff.includes(s.id) ? '#1E0A2E' : '#D4CEC8', background: selectedStaff.includes(s.id) ? '#1E0A2E' : '#fff', color: selectedStaff.includes(s.id) ? '#fff' : '#2C2C2C' }}>
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -172,7 +181,7 @@ export default function AdminAssignments() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#FAF8F4' }}>
-                {['Staff', 'Role', 'Course', 'Status', 'Due Date', 'Actions'].map(h => (
+                {['Staff', 'Branch', 'Role', 'Course', 'Status', 'Due Date', 'Actions'].map(h => (
                   <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#5A5A5A', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</th>
                 ))}
               </tr>
@@ -181,6 +190,11 @@ export default function AdminAssignments() {
               {filtered.map((a, i) => (
                 <tr key={i} style={{ borderTop: '1px solid #E2D8E8' }}>
                   <td style={{ padding: '12px 20px', fontSize: 14, fontWeight: 600, color: '#1E0A2E' }}>{(a.staff as any)?.name}</td>
+                  <td style={{ padding: '12px 20px' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: (a.staff as any)?.branch === 'Zahirabad' ? '#F3E8FF' : '#EAF1FB', color: (a.staff as any)?.branch === 'Zahirabad' ? '#6B21A8' : '#1A4A8A' }}>
+                      {(a.staff as any)?.branch || 'Boduppal'}
+                    </span>
+                  </td>
                   <td style={{ padding: '12px 20px', fontSize: 13, color: '#5A5A5A' }}>{(a.staff as any)?.role}</td>
                   <td style={{ padding: '12px 20px', fontSize: 13, color: '#2C2C2C' }}>{(a.course as any)?.title_en}</td>
                   <td style={{ padding: '12px 20px' }}>{statusBadge(a.status)}</td>

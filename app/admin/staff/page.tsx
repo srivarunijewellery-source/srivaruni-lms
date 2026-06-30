@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 
 export default function AdminStaff() {
   const [staff, setStaff] = useState<any[]>([])
+  const [branchFilter, setBranchFilter] = useState<'all' | 'Boduppal' | 'Zahirabad'>('all')
   const [selected, setSelected] = useState<any>(null)
   const [detail, setDetail] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -12,7 +13,7 @@ export default function AdminStaff() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const { data: s } = await supabase.from('staff').select('id, name, role, active').eq('active', true).order('name')
+    const { data: s } = await supabase.from('staff').select('id, name, role, active, branch').eq('active', true).order('branch').order('name')
     // For each staff, get assignment counts
     const staffWithStats = await Promise.all((s || []).map(async (st: any) => {
       const [{ count: total }, { count: completed }, { data: latestQuiz }] = await Promise.all([
@@ -67,14 +68,30 @@ export default function AdminStaff() {
           <p style={{ color: '#5A5A5A', fontSize: 14, marginTop: 4 }}>Click a staff member to see full history</p>
         </div>
 
+        {/* Branch filter */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {(['all', 'Boduppal', 'Zahirabad'] as const).map(b => (
+            <button key={b} onClick={() => setBranchFilter(b)}
+              style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', border: '1.5px solid', transition: 'all 0.15s',
+                borderColor: branchFilter === b ? '#1E0A2E' : '#D4CEC8', background: branchFilter === b ? '#1E0A2E' : '#fff', color: branchFilter === b ? '#fff' : '#5A5A5A' }}>
+              {b === 'all' ? 'All Branches' : b}
+            </button>
+          ))}
+        </div>
+
         {loading ? <p style={{ color: '#5A5A5A' }}>Loading...</p> : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {staff.map(s => (
+            {staff.filter(s => branchFilter === 'all' || s.branch === branchFilter).map(s => (
               <button key={s.id} onClick={() => loadDetail(s)}
                 style={{ background: selected?.id === s.id ? '#1E0A2E' : '#fff', border: `1.5px solid ${selected?.id === s.id ? '#1E0A2E' : '#E2D8E8'}`, borderRadius: 12, padding: '14px 16px', textAlign: 'left', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: selected?.id === s.id ? '#fff' : '#1E0A2E', marginBottom: 2 }}>{s.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: selected?.id === s.id ? '#fff' : '#1E0A2E' }}>{s.name}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, background: selected?.id === s.id ? 'rgba(255,255,255,0.15)' : (s.branch === 'Zahirabad' ? '#F3E8FF' : '#EAF1FB'), color: selected?.id === s.id ? '#C9933A' : (s.branch === 'Zahirabad' ? '#6B21A8' : '#1A4A8A') }}>
+                        {s.branch || 'Boduppal'}
+                      </span>
+                    </div>
                     <div style={{ fontSize: 12, color: selected?.id === s.id ? 'rgba(255,255,255,0.6)' : '#5A5A5A' }}>{s.role}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
